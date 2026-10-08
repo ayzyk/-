@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PriceHunter — Telegram-бот, который ищет товар сразу на нескольких маркетплейсах и присылает готовое сравнение в Excel.">
+<title>PriceHunter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: hero pairs the pitch with a live phone-chat transcript of the bot's own
+     dialogue (the product's actual UI, not an illustration); problem / features /
+     examples follow as quiet light sections underneath. */
+  :root{
+    --bg:#F5F7FA;
+    --surface:#FFFFFF;
+    --surface-2:#EEF2F7;
+    --ink:#12161F;
+    --muted:#5C6572;
+    --accent:#1C93D4;
+    --accent-ink:#FFFFFF;
+    --accent-2:#FF6B4A;
+    --line:#E2E7EF;
+    --good:#1E9E6B;
+    --lock:#9AA3B2;
+    --shadow: 0 1px 2px rgba(18,22,31,.04), 0 8px 24px -12px rgba(18,22,31,.12);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1218;
+      --surface:#171D27;
+      --surface-2:#1D2430;
+      --ink:#ECEFF4;
+      --muted:#99A2B1;
+      --accent:#5BC2F0;
+      --accent-ink:#0B1016;
+      --accent-2:#FF8A68;
+      --line:#2A3340;
+      --good:#3FC38C;
+      --lock:#6B7382;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1218;
+    --surface:#171D27;
+    --surface-2:#1D2430;
+    --ink:#ECEFF4;
+    --muted:#99A2B1;
+    --accent:#5BC2F0;
+    --accent-ink:#0B1016;
+    --accent-2:#FF8A68;
+    --line:#2A3340;
+    --good:#3FC38C;
+    --lock:#6B7382;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  img{max-width:100%;display:block}
+  a{color:var(--accent)}
+  .wrap{max-width:1120px;margin:0 auto;padding-inline:20px}
+  h1,h2,h3{font-family:"Unbounded",system-ui,sans-serif;text-wrap:balance;margin:0;letter-spacing:-.01em}
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace;
+    font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 10px;
+  }
+  .section{padding-block:64px}
+  .section-head{max-width:640px;margin-bottom:36px}
+  .section-head h2{font-size:clamp(24px,3.4vw,32px);font-weight:700}
+  .section-head p{color:var(--muted);font-size:16px;line-height:1.6;margin:12px 0 0}
+
+  /* nav */
+  .nav{position:relative;padding-block:18px}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .wordmark{font-family:"Unbounded",sans-serif;font-weight:700;font-size:18px}
+  .wordmark span{color:var(--accent)}
+  .nav-links{display:flex;gap:22px;font-size:14px;font-weight:500}
+  .nav-links a{color:var(--muted);text-decoration:none}
+  .nav-links a:hover{color:var(--ink)}
+  @media (max-width:560px){ .nav-links{display:none} }
+
+  /* hero */
+  .hero{padding-block:28px 56px}
+  .hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:start}
+  @media (max-width:860px){ .hero-grid{grid-template-columns:1fr;gap:40px} }
+  .hero h1{font-size:clamp(32px,5vw,50px);font-weight:800;line-height:1.08}
+  .hero .lead{font-size:17px;line-height:1.65;color:var(--muted);max-width:46ch;margin:20px 0 0}
+  .hero-stats{display:flex;gap:28px;margin-top:32px;flex-wrap:wrap}
+  .hero-stats .num{display:block;font-family:"Unbounded",sans-serif;font-weight:700;font-size:28px;font-variant-numeric:tabular-nums}
+  .hero-stats .lbl{display:block;font-size:13px;color:var(--muted);margin-top:2px;max-width:14ch}
+  .cta-row{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+  .btn{
+    font-size:14px;font-weight:600;text-decoration:none;
+    padding:12px 22px;border-radius:11px;display:inline-flex;align-items:center;
+    border:1px solid transparent;
+  }
+  .btn-primary{background:var(--accent);color:var(--accent-ink)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+
+  /* phone mock */
+  .phone-caption{font-size:13px;color:var(--muted);margin:0 0 12px;font-family:"JetBrains Mono",monospace}
+  .phone{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:22px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    max-width:380px;
+  }
+  .phone-bar{
+    display:flex;align-items:center;gap:10px;
+    padding:14px 18px;border-bottom:1px solid var(--line);
+    background:var(--surface-2);
+  }
+  .phone-avatar{
+    width:30px;height:30px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    flex:none;
+  }
+  .phone-bar-text{line-height:1.25}
+  .phone-bar-text .name{font-size:14px;font-weight:600}
+  .phone-bar-text .status{font-size:11.5px;color:var(--good)}
+  .chat{padding:16px 14px;display:flex;flex-direction:column;gap:8px;max-height:560px;overflow-y:auto}
+  .msg{
+    font-size:13.5px;line-height:1.45;
+    padding:9px 12px;border-radius:14px;max-width:86%;
+  }
+  .msg.bot{
+    background:var(--surface-2);color:var(--ink);
+    border-bottom-left-radius:4px;align-self:flex-start;
+  }
+  .msg.user{
+    background:var(--accent);color:var(--accent-ink);
+    border-bottom-right-radius:4px;align-self:flex-end;
+  }
+  .msg.file{display:flex;align-items:center;gap:8px}
+  .file-chip{
+    font-family:"JetBrains Mono",monospace;font-size:11.5px;
+    background:var(--surface);border:1px solid var(--line);border-radius:8px;
+    padding:3px 7px;word-break:break-all;
+  }
+  .kb{align-self:stretch;max-width:100%;background:transparent;padding:2px 0 0;}
+  .kb-label{font-size:12px;color:var(--muted);margin:2px 2px 8px;font-family:"JetBrains Mono",monospace}
+  .kb-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px}
+  .chip{
+    font-size:11.5px;padding:6px 8px;border-radius:9px;
+    background:var(--surface);border:1px solid var(--line);
+    display:flex;align-items:center;gap:5px;
+  }
+  .chip.on{border-color:var(--good);color:var(--good);font-weight:600}
+  .chip.locked{color:var(--lock)}
+  .kb-row{display:flex;gap:6px}
+  .kb-row .chip{flex:1;justify-content:center;font-weight:600}
+  .kb-row .chip.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .mono{font-family:"JetBrains Mono",monospace}
+
+  /* problem */
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:760px){ .cards3{grid-template-columns:1fr} }
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:22px;
+  }
+  .card .k{font-family:"Unbounded",sans-serif;font-size:13px;color:var(--accent-2);margin:0 0 10px}
+  .card h3{font-size:17px;font-weight:600;margin:0 0 8px}
+  .card p{font-size:14px;line-height:1.6;color:var(--muted);margin:0}
+
+  /* features */
+  .mp-cloud{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:40px}
+  .mp-pill{
+    font-size:13px;padding:7px 13px;border-radius:999px;
+    border:1px solid var(--line);background:var(--surface);
+  }
+  .mp-pill.live{border-color:var(--good);color:var(--good);font-weight:600}
+  .mp-pill.soon{color:var(--lock)}
+  .mp-cloud-note{width:100%;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:860px){ .feat-grid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:560px){ .feat-grid{grid-template-columns:1fr} }
+  .feat{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:20px;
+  }
+  .feat .glyph{
+    width:34px;height:34px;border-radius:10px;
+    background:var(--surface-2);display:flex;align-items:center;justify-content:center;
+    font-size:16px;margin-bottom:14px;
+  }
+  .feat h3{font-size:15.5px;font-weight:600;margin:0 0 6px}
+  .feat p{font-size:13.5px;line-height:1.55;color:var(--muted);margin:0}
+
+  /* examples */
+  .ex-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;align-items:start}
+  @media (max-width:760px){ .ex-grid{grid-template-columns:1fr} }
+  .ex-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .ex-shot{border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .ex-shot img{width:100%;height:auto;display:block}
+  .ex-body{padding:16px 18px}
+  .ex-body .tag{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--accent);margin:0 0 6px}
+  .ex-body h3{font-size:15.5px;font-weight:600;margin:0 0 6px}
+  .ex-body p{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0}
+
+  /* sale */
+  .sale-card{
+    background:var(--surface);border:1px solid var(--accent);border-radius:20px;
+    padding:36px 32px;box-shadow:var(--shadow);max-width:620px;
+  }
+  .sale-price{
+    font-family:"Unbounded",sans-serif;font-weight:800;font-size:38px;color:var(--ink);
+    margin-bottom:22px;display:flex;flex-direction:column;gap:4px;
+  }
+  .sale-price span{font-family:"Inter",sans-serif;font-weight:500;font-size:13.5px;color:var(--muted);letter-spacing:0}
+  .sale-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
+  .sale-list li{position:relative;padding-left:26px;font-size:14.5px;line-height:1.55;color:var(--ink)}
+  .sale-list li::before{content:"✓";position:absolute;left:0;top:0;color:var(--good);font-weight:700}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding-block:28px;margin-top:20px}
+  .footer-inner{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
+  .footer-inner p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.6}
+
+</style>
+</head>
+<body>
+
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <div class="wordmark">Price<span>Hunter</span></div>
+    <nav class="nav-links">
+      <a href="#how">Как работает</a>
+      <a href="#problem">Зачем</a>
+      <a href="#features">Что умеет</a>
+      <a href="#examples">Примеры</a>
+      <a href="#sale">Продажа</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="how">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <p class="eyebrow">Telegram-бот для поиска товаров</p>
+      <h1>Один запрос — цены сразу с 10 площадок</h1>
+      <p class="lead">Пишете боту название товара и диапазон цен. PriceHunter сам открывает каждую площадку, долистывает её до настоящего конца — постранично или прокруткой, смотря как она устроена — и присылает один Excel, отсортированный по рейтингу.</p>
+      <div class="hero-stats">
+        <div><span class="num">10</span><span class="lbl">площадок уже работают</span></div>
+        <div><span class="num">0</span><span class="lbl">вкладок открывать руками</span></div>
+        <div><span class="num">1</span><span class="lbl">файл с готовым ответом</span></div>
+      </div>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#sale">Купить проект</a>
+        <a class="btn btn-ghost" href="#how">Как это работает</a>
+      </div>
+    </div>
+    <div class="hero-phone">
+      <p class="phone-caption">// реальный диалог с ботом</p>
+      <div class="phone">
+        <div class="phone-bar">
+          <div class="phone-avatar"></div>
+          <div class="phone-bar-text">
+            <div class="name">PriceHunter</div>
+            <div class="status">бот · онлайн</div>
+          </div>
+        </div>
+        <div class="chat">
+          <div class="msg bot">Здравствуйте, пришлите мне название товара и я сразу начну его искать на разных платформах!</div>
+          <div class="msg user">Велосипед подростковый 26"</div>
+
+          <div class="msg bot kb">
+            <div>Выберите маркетплейсы кнопками ниже и нажмите «▶️ Готово».</div>
+            <div class="kb-grid" style="margin-top:10px">
+              <div class="chip on">✅ Wildberries</div>
+              <div class="chip on">✅ Яндекс Маркет</div>
+              <div class="chip">▫️ AliExpress</div>
+              <div class="chip">▫️ Ситилинк</div>
+              <div class="chip">▫️ Kari</div>
+              <div class="chip locked">🔒 Avito</div>
+              <div class="chip">▫️ Auto.ru</div>
+              <div class="chip">▫️ Дром</div>
+              <div class="chip locked">🔒 Лемана ПРО</div>
+              <div class="chip">▫️ Петрович</div>
+              <div class="chip">▫️ Максидом</div>
+              <div class="chip locked">🔒 Золотое яблоко</div>
+              <div class="chip">▫️ Летуаль</div>
+              <div class="chip locked">🔒 DNS</div>
+            </div>
+            <div class="kb-row">
+              <div class="chip">Выбрать все</div>
+              <div class="chip primary">▶️ Готово</div>
+            </div>
+          </div>
+
+          <div class="msg bot">Ищем на: Wildberries, Яндекс Маркет</div>
+          <div class="msg bot">Минимальная цена (₽)?</div>
+          <div class="msg user">10000</div>
+          <div class="msg bot">Максимальная цена (₽)?</div>
+          <div class="msg user">15000</div>
+
+          <div class="msg bot kb">
+            <div>Ищу товар, ожидайте...</div>
+            <div class="kb-row" style="margin-top:10px">
+              <div class="chip">🔄 Перезагрузить</div>
+              <div class="chip">⏹ Остановить</div>
+            </div>
+          </div>
+
+          <div class="msg bot">Готово, присылаю файл с отчётом (Excel).</div>
+          <div class="msg bot file">📎 <span class="file-chip">marketplaces_Велосипед подростковый 26".xlsx</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="problem">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Зачем он нужен</p>
+      <h2>Сравнивать цены вручную — долго</h2>
+      <p>Три причины, почему сравнение превращается в рутину.</p>
+    </div>
+    <div class="cards3">
+      <div class="card">
+        <p class="k">01</p>
+        <h3>Цены разбросаны</h3>
+        <p>Одна и та же вещь стоит по-разному на Wildberries, Яндекс Маркете, AliExpress и остальных площадках — сравнить руками значит открыть десяток вкладок.</p>
+      </div>
+      <div class="card">
+        <p class="k">02</p>
+        <h3>Ассортимент — сотни страниц</h3>
+        <p>На каждой площадке десятки-сотни карточек одного товара. Долистать вручную до конца никто не станет — видна только первая страница.</p>
+      </div>
+      <div class="card">
+        <p class="k">03</p>
+        <h3>У каждой площадки свои правила</h3>
+        <p>Одни листают постранично, другие — бесконечной прокруткой, третьи прячут часть под гео-фильтром. Без этого результат неполный.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Что умеет</p>
+      <h2>Площадки, на которых ищет бот</h2>
+      <p>14 маркетплейсов и автомобильных площадок, 10 из них уже работают.</p>
+    </div>
+    <div class="mp-cloud">
+      <span class="mp-pill live">Wildberries</span>
+      <span class="mp-pill live">Яндекс Маркет</span>
+      <span class="mp-pill live">AliExpress</span>
+      <span class="mp-pill live">Ситилинк</span>
+      <span class="mp-pill live">Kari</span>
+      <span class="mp-pill live">Auto.ru</span>
+      <span class="mp-pill live">Дром</span>
+      <span class="mp-pill live">Петрович</span>
+      <span class="mp-pill live">Максидом</span>
+      <span class="mp-pill live">Летуаль</span>
+      <span class="mp-pill soon">🔒 DNS</span>
+      <span class="mp-pill soon">🔒 Avito</span>
+      <span class="mp-pill soon">🔒 Лемана ПРО</span>
+      <span class="mp-pill soon">🔒 Золотое яблоко</span>
+      <span class="mp-pill-note mp-cloud-note">Четыре площадки помечены «в разработке»: кнопка показывает замок и честно отвечает, что выбрать их пока нельзя — вместо того чтобы молча включить то, что не работает.</span>
+    </div>
+
+    <div class="feat-grid">
+      <div class="feat">
+        <div class="glyph">📄</div>
+        <h3>Листает до настоящего конца</h3>
+        <p>Постранично или бесконечной прокруткой — как устроена конкретная площадка — а не только первая страница выдачи.</p>
+      </div>
+      <div class="feat">
+        <div class="glyph">🚗</div>
+        <h3>Поиск машин с годом выпуска</h3>
+        <p>Для Auto.ru и Дром можно задать диапазон годов выпуска или пропустить шаг — тогда без ограничения.</p>
+      </div>
+      <div class="feat">
+        <div class="glyph">⏹️</div>
+        <h3>Останавливается по команде</h3>
+        <p>Поиск идёт в фоне. Кнопкой «Остановить» можно прервать его в любой момент, не дожидаясь конца.</p>
+      </div>
+      <div class="feat">
+        <div class="glyph">📊</div>
+        <h3>Один Excel с умными столбцами</h3>
+        <p>Результат отсортирован по рейтингу, ссылки кликабельны. Для Wildberries/Яндекс Маркета/AliExpress лишние столбцы «Раздел» и «Цвет» убраны сами.</p>
+      </div>
+      <div class="feat">
+        <div class="glyph">🏷️</div>
+        <h3>У машин — свой набор колонок</h3>
+        <p>Для Auto.ru и Дром первый столбец — сразу название площадки, плюс пробег, владельцы, ПТС, таможня и обмен.</p>
+      </div>
+      <div class="feat">
+        <div class="glyph">⌨️</div>
+        <h3>Всё — кнопками меню</h3>
+        <p>Выбор площадок, цена, год выпуска, стоп — без единой команды, только обычное меню Telegram.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="examples">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Примеры</p>
+      <h2>Что приходит в ответ</h2>
+      <p>Два реальных файла из одного и того же бота — разные наборы столбцов под разные площадки.</p>
+    </div>
+    <div class="ex-grid">
+      <div class="ex-card">
+        <div class="ex-shot"><img src="images/yandex-market-example.png" alt="Фрагмент Excel-файла с результатами поиска велосипедов на Яндекс Маркете"></div>
+        <div class="ex-body">
+          <p class="tag">yandex_market.xlsx</p>
+          <h3>Яндекс Маркет, 18 товаров</h3>
+          <p>Один прогон по велосипедам: название, цена, рейтинг, наличие и кликабельная ссылка на карточку.</p>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-shot"><img src="images/auto-ru-example.png" alt="Фрагмент Excel-файла с результатами поиска BMW X6 на Auto.ru"></div>
+        <div class="ex-body">
+          <p class="tag">auto_ru.xlsx</p>
+          <h3>Auto.ru, 58 объявлений</h3>
+          <p>Поиск BMW X6 по всей стране: цвет, год, пробег, число владельцев, город, статус ПТС и цена — свой набор столбцов для авто.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sale">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Продажа проекта</p>
+      <h2>Готовый проект целиком — 10 000 ₽</h2>
+      <p>Разовая оплата, без подписок и ежемесячных платежей. Код, интеграция и документация переходят в полное владение.</p>
+    </div>
+    <div class="sale-card">
+      <div class="sale-price">10 000 ₽<span>разовый платёж, без подписки</span></div>
+      <ul class="sale-list">
+        <li>Полный исходный код Telegram-бота (Playwright + Python)</li>
+        <li>Готовый сценарий Make: вебхук, условная логика, уведомления в Telegram</li>
+        <li>Документация и презентация проекта с описанием архитектуры</li>
+        <li>Поиск по 10 маркетплейсам «из коробки», ещё 4 — в разработке</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
